@@ -29,6 +29,7 @@
     <PlatformToolset Condition="'$(VCTargetsPath11)' != ''">v110_xp</PlatformToolset>
     <PlatformToolset Condition="'$(VCTargetsPath12)' != ''">v120_xp</PlatformToolset>
     <PlatformToolset Condition="'$(VCTargetsPath14)' != ''">v140_xp</PlatformToolset>
+    <PlatformToolset Condition="'$(VCTargetsPath15)' != ''">v141_xp</PlatformToolset>
     <UseOfMfc>static</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="Exists('$(VCTargetsPath)\Platforms\$(Platform)\PlatformToolsets\ddk2003') Or Exists('$(VCTargetsPath)\..\Platforms\$(Platform)\PlatformToolsets\ddk2003')">
@@ -69,13 +70,14 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AssemblyDebug>false</AssemblyDebug>
-      <AdditionalDependencies>advapi32.lib;ntdll.min.lib;rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;bcrypt.lib;delayimp.lib;ntdll.min.lib;rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <LinkErrorReporting>NoErrorReport</LinkErrorReporting>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <ModuleDefinitionFile>mimilib.def</ModuleDefinitionFile>
+      <DelayLoadDLLs>bcrypt.dll</DelayLoadDLLs>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -87,6 +89,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="kappfree.c" />
+    <ClCompile Include="kdhcp.c" />
+    <ClCompile Include="kdns.c" />
     <ClCompile Include="kfilt.c" />
     <ClCompile Include="kssp.c" />
     <ClCompile Include="sekurlsadbg\kuhl_m_sekurlsa_nt6.c" />
@@ -98,6 +102,8 @@
     <ClCompile Include="utils.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="kdhcp.h" />
+    <ClInclude Include="kdns.h" />
     <ClInclude Include="kfilt.h" />
     <ClInclude Include="kssp.h" />
     <ClInclude Include="sekurlsadbg\kuhl_m_sekurlsa_nt6.h" />

